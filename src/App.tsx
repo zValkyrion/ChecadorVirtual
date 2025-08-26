@@ -122,39 +122,13 @@ function App() {
     );
   }
 
-  // Si hay un usuario admin logueado, mostrar el dashboard (los admins pueden acceder desde cualquier dispositivo)
+  // Si hay un usuario admin logueado, mostrar el dashboard
   if (adminUser) {
     return <AdminDashboard user={adminUser} onLogout={handleAdminLogout} />;
   }
 
-  // Si el dispositivo no está autorizado, mostrar pantalla de acceso denegado
-  // Pero permitir acceso a administradores
-  if (deviceAuthorized === false) {
-    return (
-      <div className="relative">
-        {/* Admin Login Button - siempre visible para que admins puedan acceder */}
-        <button
-          onClick={() => setShowAdminLogin(true)}
-          className="fixed top-4 right-4 z-40 bg-white/90 backdrop-blur-sm text-gray-600 p-3 rounded-full shadow-lg hover:bg-white hover:text-pink-400 transition-all duration-200 hover:scale-110"
-          title="Acceso Administrador"
-        >
-          <Settings className="h-5 w-5" />
-        </button>
-
-        {/* Pantalla de dispositivo no autorizado */}
-        <DeviceNotAuthorized deviceId={currentDeviceId} />
-
-        {/* Admin Login Modal */}
-        <AdminLogin
-          onLogin={handleAdminLogin}
-          isVisible={showAdminLogin}
-          onClose={() => setShowAdminLogin(false)}
-        />
-      </div>
-    );
-  }
-
-  // Si el dispositivo está autorizado o no hay restricción configurada, mostrar la aplicación normal
+  // Mostrar la aplicación normal - TODOS pueden ver la página principal
+  // La validación de dispositivo se hace en el momento del check-in
   return (
     <div className="relative">
       {/* Admin Login Button */}
