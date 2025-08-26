@@ -243,10 +243,10 @@ const SecurityTab: React.FC = () => {
               <div>
                 <h4 className="font-medium text-yellow-900 mb-1">Importante</h4>
                 <ul className="text-sm text-yellow-700 space-y-1">
-                  <li>• Solo un dispositivo puede estar autorizado a la vez</li>
-                  <li>• Autorizar un nuevo dispositivo revocará la autorización anterior</li>
-                  <li>• Los empleados no podrán hacer check-in desde dispositivos no autorizados</li>
-                  <li>• Los administradores siempre pueden gestionar la autorización desde cualquier dispositivo</li>
+                  <li>• Se pueden autorizar múltiples dispositivos</li>
+                  <li>• Los empleados solo pueden hacer check-in desde dispositivos autorizados</li>
+                  <li>• Los administradores pueden acceder desde cualquier dispositivo</li>
+                  <li>• Los dispositivos se almacenan en la base de datos de forma segura</li>
                 </ul>
               </div>
             </div>

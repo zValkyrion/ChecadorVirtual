@@ -1,19 +1,20 @@
-import React, { useState } from 'react';
-import { Clock, LogIn, LogOut, User, Lock, Sparkles, Heart } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Clock, LogIn, LogOut, User, Lock, Sparkles, Heart, Shield } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { comparePassword, formatTime } from '../utils/auth';
+import { isDeviceAuthorized, generateDeviceFingerprint } from '../utils/deviceAuth';
 
 export default function CheckinForm() {
   const [credentials, setCredentials] = useState({ usuario: '', contraseña: '' });
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState({ text: '', type: '' });
 
-  const showMessage = (text, type) => {
+  const showMessage = (text: string, type: string) => {
     setMessage({ text, type });
     setTimeout(() => setMessage({ text: '', type: '' }), 4000);
   };
 
-  const handleCheckin = async (type) => {
+  const handleCheckin = async (type: string) => {
     if (!credentials.usuario || !credentials.contraseña) {
       showMessage('Por favor complete todos los campos', 'error');
       return;
@@ -42,6 +43,20 @@ export default function CheckinForm() {
       if (!isValidPassword) {
         showMessage('Contraseña incorrecta', 'error');
         return;
+      }
+
+      // VALIDACIÓN DE DISPOSITIVO AUTORIZADO PARA EMPLEADOS
+      // Los administradores pueden hacer check-in desde cualquier dispositivo
+      if (user.rol === 'empleado') {
+        const deviceAuthorized = await isDeviceAuthorized();
+        if (!deviceAuthorized) {
+          const deviceInfo = await generateDeviceFingerprint();
+          showMessage(
+            `Dispositivo no autorizado. Contacta al administrador y proporciona este ID: ${deviceInfo.id.substring(0, 8)}...`, 
+            'error'
+          );
+          return;
+        }
       }
 
       const now = new Date();
