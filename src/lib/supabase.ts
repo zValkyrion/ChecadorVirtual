@@ -27,3 +27,21 @@ export interface Checada {
   updated_at: string;
   usuarios?: Usuario;
 }
+
+export interface DispositivoAutorizado {
+  id: string;
+  device_id: string;
+  nombre: string;
+  user_agent: string;
+  screen: string;
+  timezone: string;
+  language: string;
+  platform: string;
+  hardware_concurrency: number;
+  device_memory?: number;
+  color_depth: number;
+  pixel_ratio: number;
+  activo: boolean;
+  created_at: string;
+  updated_at: string;
+}

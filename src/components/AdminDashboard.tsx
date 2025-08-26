@@ -1,18 +1,267 @@
 import React, { useState, useEffect } from 'react';
-import { Users, Clock, AlertCircle, Calendar, Plus, Trash2, Edit, LogOut, Filter } from 'lucide-react';
+import { Users, Clock, AlertCircle, Calendar, Plus, Trash2, Edit, LogOut, Filter, Shield, Computer } from 'lucide-react';
 import { supabase, Usuario, Checada } from '../lib/supabase';
 import { hashPassword, formatDate, formatTime, isLateEntry, isEarlyExit } from '../utils/auth';
+import { 
+  generateDeviceFingerprint, 
+  authorizeCurrentDevice, 
+  getAuthorizedDevices, 
+  revokeDeviceAuthorization, 
+  hasAuthorizedDevice,
+  getCurrentDeviceInfo
+} from '../utils/deviceAuth';
 
 interface AdminDashboardProps {
   user: Usuario;
   onLogout: () => void;
 }
 
+// Componente para la pestaña de seguridad
+const SecurityTab: React.FC = () => {
+  const [currentDeviceInfo, setCurrentDeviceInfo] = useState<any>(null);
+  const [authorizedDevices, setAuthorizedDevices] = useState<any[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [hasDevices, setHasDevices] = useState(false);
+
+  useEffect(() => {
+    loadDeviceInfo();
+  }, []);
+
+  const loadDeviceInfo = async () => {
+    try {
+      const current = await generateDeviceFingerprint();
+      const devices = await getAuthorizedDevices();
+      const hasAuth = await hasAuthorizedDevice();
+      
+      setCurrentDeviceInfo(current);
+      setAuthorizedDevices(devices);
+      setHasDevices(hasAuth);
+    } catch (error) {
+      console.error('Error loading device info:', error);
+    }
+  };
+
+  const handleAuthorizeDevice = async () => {
+    if (!confirm('¿Estás seguro de que deseas autorizar este dispositivo? Esto revocará cualquier autorización anterior.')) {
+      return;
+    }
+
+    setLoading(true);
+    try {
+      await authorizeCurrentDevice();
+      await loadDeviceInfo();
+      alert('Dispositivo autorizado exitosamente');
+    } catch (error) {
+      console.error('Error authorizing device:', error);
+      alert('Error al autorizar dispositivo');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleRevokeAuthorization = async () => {
+    if (!confirm('¿Estás seguro de que deseas revocar la autorización? Esto bloqueará el acceso al sistema.')) {
+      return;
+    }
+
+    try {
+      await revokeDeviceAuthorization();
+      await loadDeviceInfo();
+      alert('Autorización revocada exitosamente');
+    } catch (error) {
+      console.error('Error revocando autorización:', error);
+      alert('Error al revocar autorización');
+    }
+  };
+
+  const isCurrentDeviceAuthorized = authorizedDevices.length > 0 && currentDeviceInfo && 
+    authorizedDevices.some(device => device.device_id === currentDeviceInfo.id);
+
+  return (
+    <div className="space-y-6">
+      <div className="flex justify-between items-center">
+        <h2 className="text-2xl font-bold text-gray-800">Seguridad del Sistema</h2>
+      </div>
+
+      {/* Estado de Seguridad */}
+      <div className="bg-white rounded-xl shadow-sm p-6">
+        <div className="flex items-center gap-3 mb-4">
+          <Shield className="h-6 w-6 text-blue-600" />
+          <h3 className="text-lg font-semibold text-gray-800">Estado de Autenticación por Dispositivo</h3>
+        </div>
+        
+        <div className={`p-4 rounded-lg border-2 ${
+          hasDevices 
+            ? isCurrentDeviceAuthorized 
+              ? 'border-green-200 bg-green-50' 
+              : 'border-red-200 bg-red-50'
+            : 'border-yellow-200 bg-yellow-50'
+        }`}>
+          <div className="flex items-center gap-2 mb-2">
+            {hasDevices ? (
+              isCurrentDeviceAuthorized ? (
+                <>
+                  <div className="w-3 h-3 bg-green-500 rounded-full"></div>
+                  <span className="font-medium text-green-800">Dispositivo Autorizado</span>
+                </>
+              ) : (
+                <>
+                  <div className="w-3 h-3 bg-red-500 rounded-full"></div>
+                  <span className="font-medium text-red-800">Dispositivo No Autorizado</span>
+                </>
+              )
+            ) : (
+              <>
+                <div className="w-3 h-3 bg-yellow-500 rounded-full"></div>
+                <span className="font-medium text-yellow-800">Sin Configurar</span>
+              </>
+            )}
+          </div>
+          <p className="text-sm text-gray-600">
+            {hasDevices 
+              ? isCurrentDeviceAuthorized
+                ? 'Este dispositivo está autorizado para acceder al sistema.'
+                : 'Este dispositivo NO está autorizado. Solo dispositivos autorizados pueden acceder al sistema.'
+              : 'No hay ningún dispositivo autorizado configurado. El sistema está abierto a cualquier dispositivo.'
+            }
+          </p>
+        </div>
+      </div>
+
+      {/* Información del Dispositivo Actual */}
+      <div className="bg-white rounded-xl shadow-sm p-6">
+        <div className="flex items-center gap-3 mb-4">
+          <Computer className="h-6 w-6 text-purple-600" />
+          <h3 className="text-lg font-semibold text-gray-800">Dispositivo Actual</h3>
+        </div>
+        
+        {currentDeviceInfo && (
+          <div className="space-y-3">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">ID del Dispositivo</label>
+                <code className="block text-xs bg-gray-100 p-2 rounded border break-all">
+                  {currentDeviceInfo.id}
+                </code>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Plataforma</label>
+                <p className="text-sm text-gray-900">{currentDeviceInfo.platform}</p>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Resolución de Pantalla</label>
+                <p className="text-sm text-gray-900">{currentDeviceInfo.screen}</p>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Zona Horaria</label>
+                <p className="text-sm text-gray-900">{currentDeviceInfo.timezone}</p>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Idioma</label>
+                <p className="text-sm text-gray-900">{currentDeviceInfo.language}</p>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Núcleos de CPU</label>
+                <p className="text-sm text-gray-900">{currentDeviceInfo.hardwareConcurrency}</p>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Dispositivos Autorizados */}
+      {authorizedDevices.length > 0 && (
+        <div className="bg-white rounded-xl shadow-sm p-6">
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-3">
+              <Shield className="h-6 w-6 text-green-600" />
+              <h3 className="text-lg font-semibold text-gray-800">Dispositivos Autorizados ({authorizedDevices.length})</h3>
+            </div>
+            <button
+              onClick={handleRevokeAuthorization}
+              className="flex items-center gap-2 px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors"
+            >
+              <Trash2 className="h-4 w-4" />
+              Revocar Todas las Autorizaciones
+            </button>
+          </div>
+          
+          <div className="space-y-4">
+            {authorizedDevices.map((device, index) => (
+              <div key={device.device_id || device.id || index} className="border border-gray-200 rounded-lg p-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">ID del Dispositivo</label>
+                    <code className="block text-xs bg-gray-100 p-2 rounded border break-all">
+                      {device.device_id || device.id}
+                    </code>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Nombre</label>
+                    <p className="text-sm text-gray-900">{device.nombre || 'Sin nombre'}</p>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Plataforma</label>
+                    <p className="text-sm text-gray-900">{device.platform}</p>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Resolución de Pantalla</label>
+                    <p className="text-sm text-gray-900">{device.screen}</p>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Acciones */}
+      <div className="bg-white rounded-xl shadow-sm p-6">
+        <h3 className="text-lg font-semibold text-gray-800 mb-4">Acciones de Seguridad</h3>
+        
+        <div className="space-y-4">
+          <div className="flex items-start gap-4 p-4 border border-blue-200 rounded-lg bg-blue-50">
+            <Shield className="h-6 w-6 text-blue-600 mt-1" />
+            <div className="flex-1">
+              <h4 className="font-medium text-blue-900 mb-1">Autorizar Este Dispositivo</h4>
+              <p className="text-sm text-blue-700 mb-3">
+                Autoriza este dispositivo para acceder al sistema. Solo dispositivos autorizados podrán usar el checador virtual.
+              </p>
+              <button
+                onClick={handleAuthorizeDevice}
+                disabled={loading}
+                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50"
+              >
+                {loading ? 'Autorizando...' : 'Autorizar Dispositivo'}
+              </button>
+            </div>
+          </div>
+
+          <div className="p-4 border border-yellow-200 rounded-lg bg-yellow-50">
+            <div className="flex items-start gap-4">
+              <AlertCircle className="h-6 w-6 text-yellow-600 mt-1" />
+              <div>
+                <h4 className="font-medium text-yellow-900 mb-1">Importante</h4>
+                <ul className="text-sm text-yellow-700 space-y-1">
+                  <li>• Solo un dispositivo puede estar autorizado a la vez</li>
+                  <li>• Autorizar un nuevo dispositivo revocará la autorización anterior</li>
+                  <li>• Los empleados no podrán hacer check-in desde dispositivos no autorizados</li>
+                  <li>• Los administradores siempre pueden gestionar la autorización desde cualquier dispositivo</li>
+                </ul>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 export default function AdminDashboard({ user, onLogout }: AdminDashboardProps) {
   const [usuarios, setUsuarios] = useState<Usuario[]>([]);
   const [checadas, setChecadas] = useState<Checada[]>([]);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'users' | 'reports'>('dashboard');
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'users' | 'reports' | 'security'>('dashboard');
   const [dateFilter, setDateFilter] = useState({
     from: '',
     to: ''
@@ -177,7 +426,8 @@ export default function AdminDashboard({ user, onLogout }: AdminDashboardProps) 
           {[
             { id: 'dashboard', label: 'Dashboard', icon: Clock },
             { id: 'users', label: 'Usuarios', icon: Users },
-            { id: 'reports', label: 'Reportes', icon: Calendar }
+            { id: 'reports', label: 'Reportes', icon: Calendar },
+            { id: 'security', label: 'Seguridad', icon: Shield }
           ].map(({ id, label, icon: Icon }) => (
             <button
               key={id}
@@ -508,6 +758,11 @@ export default function AdminDashboard({ user, onLogout }: AdminDashboardProps) 
               </div>
             </div>
           </div>
+        )}
+
+        {/* Security Tab */}
+        {activeTab === 'security' && (
+          <SecurityTab />
         )}
       </div>
 
