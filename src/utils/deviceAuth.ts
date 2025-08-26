@@ -83,30 +83,31 @@ export const isDeviceAuthorized = async (): Promise<boolean> => {
 
     if (error) {
       console.error('Error consultando dispositivos autorizados:', error);
-      // Si hay error en la consulta, verificar si hay dispositivos configurados
-      const { count, error: countError } = await supabase
-        .from('dispositivos_autorizados')
-        .select('*', { count: 'exact', head: true })
-        .eq('activo', true);
-      
-      // Si no hay dispositivos configurados o hay error, permitir acceso para configuración inicial
-      return countError !== null || count === 0;
+      // Si hay error en la consulta, DENEGAR acceso por seguridad
+      return false;
     }
 
-    // Si no hay dispositivos autorizados configurados, permitir acceso para configuración inicial
-    if (!authorizedDevices || authorizedDevices.length === 0) {
-      const { count } = await supabase
-        .from('dispositivos_autorizados')
-        .select('*', { count: 'exact', head: true })
-        .eq('activo', true);
-      
-      return count === 0;
+    // Si el dispositivo específico está autorizado, permitir acceso
+    if (authorizedDevices && authorizedDevices.length > 0) {
+      return true;
+    }
+
+    // Si no se encuentra el dispositivo, verificar si hay dispositivos configurados
+    const { count, error: countError } = await supabase
+      .from('dispositivos_autorizados')
+      .select('*', { count: 'exact', head: true })
+      .eq('activo', true);
+    
+    if (countError) {
+      console.error('Error verificando dispositivos configurados:', countError);
+      return false; // En caso de error, denegar acceso por seguridad
     }
     
-    return authorizedDevices.length > 0;
+    // Solo permitir acceso si NO hay dispositivos configurados (configuración inicial)
+    return count === 0;
   } catch (error) {
     console.error('Error verificando autorización del dispositivo:', error);
-    return true; // En caso de error, permitir acceso para configuración inicial
+    return false; // En caso de error, DENEGAR acceso por seguridad
   }
 };
 
