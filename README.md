@@ -1,2 +1,1 @@
-# ChecadorVirtual
-Checador de empleados
+ChecadorVirtual
