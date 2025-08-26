@@ -61,17 +61,32 @@ const SecurityTab: React.FC = () => {
   };
 
   const handleRevokeAuthorization = async () => {
-    if (!confirm('¿Estás seguro de que deseas revocar la autorización? Esto bloqueará el acceso al sistema.')) {
+    if (!confirm('¿Estás seguro de que deseas revocar TODAS las autorizaciones? Esto bloqueará el acceso al sistema para todos los dispositivos.')) {
       return;
     }
 
     try {
       await revokeDeviceAuthorization();
       await loadDeviceInfo();
-      alert('Autorización revocada exitosamente');
+      alert('Todas las autorizaciones han sido revocadas exitosamente');
     } catch (error) {
       console.error('Error revocando autorización:', error);
-      alert('Error al revocar autorización');
+      alert('Error al revocar autorizaciones');
+    }
+  };
+
+  const handleRevokeDeviceAuthorization = async (deviceId: string) => {
+    if (!confirm('¿Estás seguro de que deseas revocar la autorización de este dispositivo específico?')) {
+      return;
+    }
+
+    try {
+      await revokeDeviceAuthorization(deviceId);
+      await loadDeviceInfo();
+      alert('Autorización del dispositivo revocada exitosamente');
+    } catch (error) {
+      console.error('Error revocando autorización del dispositivo:', error);
+      alert('Error al revocar autorización del dispositivo');
     }
   };
 
@@ -191,16 +206,38 @@ const SecurityTab: React.FC = () => {
           <div className="space-y-4">
             {authorizedDevices.map((device, index) => (
               <div key={device.device_id || device.id || index} className="border border-gray-200 rounded-lg p-4">
+                <div className="flex flex-col sm:flex-row justify-between items-start gap-4 mb-4">
+                  <div className="flex items-center gap-3">
+                    <div className={`w-3 h-3 rounded-full ${
+                      currentDeviceInfo && device.device_id === currentDeviceInfo.id 
+                        ? 'bg-green-500' 
+                        : 'bg-gray-400'
+                    }`}></div>
+                    <span className="font-medium text-gray-800">
+                      {device.nombre || 'Sin nombre'}
+                      {currentDeviceInfo && device.device_id === currentDeviceInfo.id && (
+                        <span className="ml-2 text-xs bg-green-100 text-green-800 px-2 py-1 rounded-full">
+                          Dispositivo Actual
+                        </span>
+                      )}
+                    </span>
+                  </div>
+                  <button
+                    onClick={() => handleRevokeDeviceAuthorization(device.device_id)}
+                    className="flex items-center gap-2 px-3 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors text-sm"
+                    title="Revocar autorización de este dispositivo"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                    <span className="hidden sm:inline">Revocar</span>
+                  </button>
+                </div>
+                
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="col-span-1 sm:col-span-2">
                     <label className="block text-sm font-medium text-gray-700 mb-2">ID del Dispositivo</label>
                     <code className="block text-xs bg-gray-100 p-3 rounded border break-all font-mono">
                       {device.device_id || device.id}
                     </code>
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Nombre</label>
-                    <p className="text-sm text-gray-900 bg-gray-50 p-2 rounded">{device.nombre || 'Sin nombre'}</p>
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">Plataforma</label>
@@ -213,6 +250,18 @@ const SecurityTab: React.FC = () => {
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">Zona Horaria</label>
                     <p className="text-sm text-gray-900 bg-gray-50 p-2 rounded">{device.timezone}</p>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Fecha de Autorización</label>
+                    <p className="text-sm text-gray-900 bg-gray-50 p-2 rounded">
+                      {device.created_at ? new Date(device.created_at).toLocaleDateString('es-ES', {
+                        year: 'numeric',
+                        month: 'long',
+                        day: 'numeric',
+                        hour: '2-digit',
+                        minute: '2-digit'
+                      }) : 'No disponible'}
+                    </p>
                   </div>
                 </div>
               </div>
@@ -412,7 +461,7 @@ export default function AdminDashboard({ user, onLogout }: AdminDashboardProps) 
               </div>
               <div>
                 <h1 className="text-xl font-bold text-gray-800">Panel de Asistencias</h1>
-                <p className="text-sm text-gray-600">Bienvenido, {user.nombre}</p>
+                <p className="text-sm text-gray-600">Bienvenido/a, {user.nombre}</p>
               </div>
             </div>
             <button
