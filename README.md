@@ -1,0 +1,2 @@
+# ChecadorVirtual
+Checador de empleados
