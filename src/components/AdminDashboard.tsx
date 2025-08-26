@@ -10,6 +10,7 @@ import {
   hasAuthorizedDevice,
   getCurrentDeviceInfo
 } from '../utils/deviceAuth';
+import AdvancedReports from './AdvancedReports';
 
 interface AdminDashboardProps {
   user: Usuario;
@@ -129,40 +130,40 @@ const SecurityTab: React.FC = () => {
       </div>
 
       {/* Información del Dispositivo Actual */}
-      <div className="bg-white rounded-xl shadow-sm p-6">
+      <div className="bg-white rounded-xl shadow-sm p-4 sm:p-6">
         <div className="flex items-center gap-3 mb-4">
           <Computer className="h-6 w-6 text-purple-600" />
           <h3 className="text-lg font-semibold text-gray-800">Dispositivo Actual</h3>
         </div>
         
         {currentDeviceInfo && (
-          <div className="space-y-3">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">ID del Dispositivo</label>
-                <code className="block text-xs bg-gray-100 p-2 rounded border break-all">
+          <div className="space-y-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="col-span-1 sm:col-span-2">
+                <label className="block text-sm font-medium text-gray-700 mb-2">ID del Dispositivo</label>
+                <code className="block text-xs bg-gray-100 p-3 rounded border break-all font-mono">
                   {currentDeviceInfo.id}
                 </code>
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Plataforma</label>
-                <p className="text-sm text-gray-900">{currentDeviceInfo.platform}</p>
+                <p className="text-sm text-gray-900 bg-gray-50 p-2 rounded">{currentDeviceInfo.platform}</p>
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Resolución de Pantalla</label>
-                <p className="text-sm text-gray-900">{currentDeviceInfo.screen}</p>
+                <p className="text-sm text-gray-900 bg-gray-50 p-2 rounded">{currentDeviceInfo.screen}</p>
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Zona Horaria</label>
-                <p className="text-sm text-gray-900">{currentDeviceInfo.timezone}</p>
+                <p className="text-sm text-gray-900 bg-gray-50 p-2 rounded">{currentDeviceInfo.timezone}</p>
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Idioma</label>
-                <p className="text-sm text-gray-900">{currentDeviceInfo.language}</p>
+                <p className="text-sm text-gray-900 bg-gray-50 p-2 rounded">{currentDeviceInfo.language}</p>
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Núcleos de CPU</label>
-                <p className="text-sm text-gray-900">{currentDeviceInfo.hardwareConcurrency}</p>
+                <p className="text-sm text-gray-900 bg-gray-50 p-2 rounded">{currentDeviceInfo.hardwareConcurrency}</p>
               </div>
             </div>
           </div>
@@ -171,42 +172,47 @@ const SecurityTab: React.FC = () => {
 
       {/* Dispositivos Autorizados */}
       {authorizedDevices.length > 0 && (
-        <div className="bg-white rounded-xl shadow-sm p-6">
-          <div className="flex items-center justify-between mb-4">
+        <div className="bg-white rounded-xl shadow-sm p-4 sm:p-6">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4">
             <div className="flex items-center gap-3">
               <Shield className="h-6 w-6 text-green-600" />
               <h3 className="text-lg font-semibold text-gray-800">Dispositivos Autorizados ({authorizedDevices.length})</h3>
             </div>
             <button
               onClick={handleRevokeAuthorization}
-              className="flex items-center gap-2 px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors"
+              className="flex items-center gap-2 px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors text-sm"
             >
               <Trash2 className="h-4 w-4" />
-              Revocar Todas las Autorizaciones
+              <span className="hidden sm:inline">Revocar Todas las Autorizaciones</span>
+              <span className="sm:hidden">Revocar Todas</span>
             </button>
           </div>
           
           <div className="space-y-4">
             {authorizedDevices.map((device, index) => (
               <div key={device.device_id || device.id || index} className="border border-gray-200 rounded-lg p-4">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">ID del Dispositivo</label>
-                    <code className="block text-xs bg-gray-100 p-2 rounded border break-all">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="col-span-1 sm:col-span-2">
+                    <label className="block text-sm font-medium text-gray-700 mb-2">ID del Dispositivo</label>
+                    <code className="block text-xs bg-gray-100 p-3 rounded border break-all font-mono">
                       {device.device_id || device.id}
                     </code>
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">Nombre</label>
-                    <p className="text-sm text-gray-900">{device.nombre || 'Sin nombre'}</p>
+                    <p className="text-sm text-gray-900 bg-gray-50 p-2 rounded">{device.nombre || 'Sin nombre'}</p>
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">Plataforma</label>
-                    <p className="text-sm text-gray-900">{device.platform}</p>
+                    <p className="text-sm text-gray-900 bg-gray-50 p-2 rounded">{device.platform}</p>
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">Resolución de Pantalla</label>
-                    <p className="text-sm text-gray-900">{device.screen}</p>
+                    <p className="text-sm text-gray-900 bg-gray-50 p-2 rounded">{device.screen}</p>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Zona Horaria</label>
+                    <p className="text-sm text-gray-900 bg-gray-50 p-2 rounded">{device.timezone}</p>
                   </div>
                 </div>
               </div>
@@ -216,13 +222,13 @@ const SecurityTab: React.FC = () => {
       )}
 
       {/* Acciones */}
-      <div className="bg-white rounded-xl shadow-sm p-6">
+      <div className="bg-white rounded-xl shadow-sm p-4 sm:p-6">
         <h3 className="text-lg font-semibold text-gray-800 mb-4">Acciones de Seguridad</h3>
         
         <div className="space-y-4">
-          <div className="flex items-start gap-4 p-4 border border-blue-200 rounded-lg bg-blue-50">
-            <Shield className="h-6 w-6 text-blue-600 mt-1" />
-            <div className="flex-1">
+          <div className="flex flex-col sm:flex-row items-start gap-4 p-4 border border-blue-200 rounded-lg bg-blue-50">
+            <Shield className="h-6 w-6 text-blue-600 mt-1 flex-shrink-0" />
+            <div className="flex-1 min-w-0">
               <h4 className="font-medium text-blue-900 mb-1">Autorizar Este Dispositivo</h4>
               <p className="text-sm text-blue-700 mb-3">
                 Autoriza este dispositivo para acceder al sistema. Solo dispositivos autorizados podrán usar el checador virtual.
@@ -230,7 +236,7 @@ const SecurityTab: React.FC = () => {
               <button
                 onClick={handleAuthorizeDevice}
                 disabled={loading}
-                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50"
+                className="w-full sm:w-auto px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50"
               >
                 {loading ? 'Autorizando...' : 'Autorizar Dispositivo'}
               </button>
@@ -238,10 +244,10 @@ const SecurityTab: React.FC = () => {
           </div>
 
           <div className="p-4 border border-yellow-200 rounded-lg bg-yellow-50">
-            <div className="flex items-start gap-4">
-              <AlertCircle className="h-6 w-6 text-yellow-600 mt-1" />
-              <div>
-                <h4 className="font-medium text-yellow-900 mb-1">Importante</h4>
+            <div className="flex flex-col sm:flex-row items-start gap-4">
+              <AlertCircle className="h-6 w-6 text-yellow-600 mt-1 flex-shrink-0" />
+              <div className="min-w-0">
+                <h4 className="font-medium text-yellow-900 mb-2">Importante</h4>
                 <ul className="text-sm text-yellow-700 space-y-1">
                   <li>• Se pueden autorizar múltiples dispositivos</li>
                   <li>• Los empleados solo pueden hacer check-in desde dispositivos autorizados</li>
@@ -422,7 +428,7 @@ export default function AdminDashboard({ user, onLogout }: AdminDashboardProps) 
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Navigation Tabs */}
-        <div className="flex space-x-4 mb-8">
+        <div className="flex flex-wrap gap-2 sm:gap-4 mb-8">
           {[
             { id: 'dashboard', label: 'Dashboard', icon: Clock },
             { id: 'users', label: 'Usuarios', icon: Users },
@@ -432,14 +438,20 @@ export default function AdminDashboard({ user, onLogout }: AdminDashboardProps) 
             <button
               key={id}
               onClick={() => setActiveTab(id as any)}
-              className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-colors ${
+              className={`flex items-center gap-2 px-3 sm:px-4 py-2 rounded-lg transition-colors text-sm sm:text-base ${
                 activeTab === id
                   ? 'bg-pink-400 text-white'
                   : 'bg-white text-gray-700 hover:bg-pink-50'
               }`}
             >
               <Icon className="h-4 w-4" />
-              {label}
+              <span className="hidden sm:inline">{label}</span>
+              <span className="sm:hidden">
+                {id === 'dashboard' ? 'Panel' : 
+                 id === 'users' ? 'Users' : 
+                 id === 'reports' ? 'Reports' : 
+                 'Security'}
+              </span>
             </button>
           ))}
         </div>
@@ -657,107 +669,11 @@ export default function AdminDashboard({ user, onLogout }: AdminDashboardProps) 
 
         {/* Reports Tab */}
         {activeTab === 'reports' && (
-          <div className="space-y-6">
-            <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
-              <h2 className="text-2xl font-bold text-gray-800">Reportes de Asistencia</h2>
-              
-              <div className="flex gap-4 items-center">
-                <Filter className="h-5 w-5 text-gray-500" />
-                <input
-                  type="date"
-                  value={dateFilter.from}
-                  onChange={(e) => setDateFilter(prev => ({ ...prev, from: e.target.value }))}
-                  className="px-3 py-2 border border-gray-300 rounded-lg text-sm"
-                  placeholder="Desde"
-                />
-                <input
-                  type="date"
-                  value={dateFilter.to}
-                  onChange={(e) => setDateFilter(prev => ({ ...prev, to: e.target.value }))}
-                  className="px-3 py-2 border border-gray-300 rounded-lg text-sm"
-                  placeholder="Hasta"
-                />
-              </div>
-            </div>
-
-            <div className="bg-white rounded-xl shadow-sm overflow-hidden">
-              <div className="overflow-x-auto">
-                <table className="w-full">
-                  <thead className="bg-gray-50">
-                    <tr>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Usuario
-                      </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Fecha
-                      </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Entrada
-                      </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Salida
-                      </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Estado
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody className="bg-white divide-y divide-gray-200">
-                    {filteredChecadas.map((checada) => (
-                      <tr key={checada.id}>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="text-sm font-medium text-gray-900">
-                            {checada.usuarios?.nombre || 'Usuario desconocido'}
-                          </div>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                          {formatDate(new Date(checada.fecha))}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <div className={`text-sm ${
-                            checada.hora_entrada && isLateEntry(formatTime(new Date(checada.hora_entrada)))
-                              ? 'text-red-600 font-semibold'
-                              : 'text-gray-900'
-                          }`}>
-                            {checada.hora_entrada ? formatTime(new Date(checada.hora_entrada)) : '-'}
-                          </div>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <div className={`text-sm ${
-                            checada.hora_salida && isEarlyExit(formatTime(new Date(checada.hora_salida)))
-                              ? 'text-orange-600 font-semibold'
-                              : 'text-gray-900'
-                          }`}>
-                            {checada.hora_salida ? formatTime(new Date(checada.hora_salida)) : '-'}
-                          </div>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="flex flex-wrap gap-1">
-                            {checada.hora_entrada && isLateEntry(formatTime(new Date(checada.hora_entrada))) && (
-                              <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-red-100 text-red-800">
-                                Llegada Tarde
-                              </span>
-                            )}
-                            {checada.hora_salida && isEarlyExit(formatTime(new Date(checada.hora_salida))) && (
-                              <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-orange-100 text-orange-800">
-                                Salida Temprano
-                              </span>
-                            )}
-                            {(!checada.hora_entrada || !isLateEntry(formatTime(new Date(checada.hora_entrada)))) && 
-                             (!checada.hora_salida || !isEarlyExit(formatTime(new Date(checada.hora_salida)))) && (
-                              <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-green-100 text-green-800">
-                                Normal
-                              </span>
-                            )}
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          </div>
+          <AdvancedReports 
+            usuarios={usuarios} 
+            checadas={checadas} 
+            onRefresh={loadData}
+          />
         )}
 
         {/* Security Tab */}
