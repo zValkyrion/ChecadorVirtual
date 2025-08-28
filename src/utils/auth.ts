@@ -34,26 +34,54 @@ export const formatDate = (date: Date): string => {
   });
 };
 
-// Función para verificar llegadas tarde (después de las 9:00 AM)
-export const isLateEntry = (entryTime: string, cutoffTime: string = '09:00'): boolean => {
+// Función para verificar llegadas tarde con horario personalizado y tolerancia
+export const isLateEntryWithSchedule = (
+  entryTime: string, 
+  scheduledTime: string = '09:00', 
+  toleranceMinutes: number = 15
+): boolean => {
   const [entryHour, entryMinute] = entryTime.split(':').map(Number);
-  const [cutoffHour, cutoffMinute] = cutoffTime.split(':').map(Number);
+  const [scheduledHour, scheduledMinute] = scheduledTime.split(':').map(Number);
   
   const entryInMinutes = entryHour * 60 + entryMinute;
-  const cutoffInMinutes = cutoffHour * 60 + cutoffMinute;
+  const scheduledInMinutes = scheduledHour * 60 + scheduledMinute;
+  const maxAllowedMinutes = scheduledInMinutes + toleranceMinutes;
   
-  return entryInMinutes > cutoffInMinutes;
+  return entryInMinutes > maxAllowedMinutes;
 };
 
-// Función para verificar salidas temprano (antes de las 7:00 PM)
-export const isEarlyExit = (exitTime: string, minimumTime: string = '19:00'): boolean => {
+// Función para verificar llegadas tarde (después de las 9:00 AM) - mantener compatibilidad
+export const isLateEntry = (entryTime: string, cutoffTime: string = '09:00'): boolean => {
+  return isLateEntryWithSchedule(entryTime, cutoffTime, 0);
+};
+
+// Función para verificar salidas temprano con horario personalizado
+export const isEarlyExitWithSchedule = (exitTime: string, scheduledTime: string = '19:00'): boolean => {
   const [exitHour, exitMinute] = exitTime.split(':').map(Number);
-  const [minimumHour, minimumMinute] = minimumTime.split(':').map(Number);
+  const [scheduledHour, scheduledMinute] = scheduledTime.split(':').map(Number);
   
   const exitInMinutes = exitHour * 60 + exitMinute;
-  const minimumInMinutes = minimumHour * 60 + minimumMinute;
+  const scheduledInMinutes = scheduledHour * 60 + scheduledMinute;
   
-  return exitInMinutes < minimumInMinutes;
+  return exitInMinutes < scheduledInMinutes;
+};
+
+// Función para verificar salidas temprano (antes de las 7:00 PM) - mantener compatibilidad
+export const isEarlyExit = (exitTime: string, minimumTime: string = '19:00'): boolean => {
+  return isEarlyExitWithSchedule(exitTime, minimumTime);
+};
+
+// Función para convertir tiempo de formato HH:MM:SS a HH:MM
+export const formatTimeToHHMM = (timeString: string): string => {
+  if (!timeString) return '';
+  return timeString.substring(0, 5); // Toma solo HH:MM
+};
+
+// Función para obtener solo la hora de un timestamp
+export const extractTimeFromTimestamp = (timestamp: string): string => {
+  if (!timestamp) return '';
+  const date = new Date(timestamp);
+  return formatTime(date);
 };
 
 // Función para obtener la fecha/hora actual en zona horaria de Ciudad de México

@@ -23,6 +23,19 @@ export interface Checada {
   fecha: string;
   hora_entrada: string | null;
   hora_salida: string | null;
+  razon_llegada_tardia: string | null;
+  created_at: string;
+  updated_at: string;
+  usuarios?: Usuario;
+}
+
+export interface HorarioEmpleado {
+  id: string;
+  usuario_id: string;
+  hora_entrada: string;
+  hora_salida: string;
+  tolerancia_minutos: number;
+  activo: boolean;
   created_at: string;
   updated_at: string;
   usuarios?: Usuario;

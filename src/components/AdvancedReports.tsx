@@ -1,14 +1,14 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
   PieChart, Pie, Cell
 } from 'recharts';
 import { 
   TrendingUp, TrendingDown, Clock, AlertTriangle, 
-  Target, Award, Filter, Download, RefreshCw
+  Target, Award, Filter, Download, RefreshCw, MessageSquare
 } from 'lucide-react';
-import { Usuario, Checada } from '../lib/supabase';
-import { formatDate, formatTime, isLateEntry, isEarlyExit } from '../utils/auth';
+import { Usuario, Checada, HorarioEmpleado, supabase } from '../lib/supabase';
+import { formatDate, formatTime, isLateEntryWithSchedule, isEarlyExitWithSchedule, formatTimeToHHMM } from '../utils/auth';
 
 interface AdvancedReportsProps {
   usuarios: Usuario[];
@@ -24,6 +24,57 @@ const AdvancedReports: React.FC<AdvancedReportsProps> = ({ usuarios, checadas, o
     from: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
     to: new Date().toISOString().split('T')[0]
   });
+  const [horarios, setHorarios] = useState<HorarioEmpleado[]>([]);
+
+  useEffect(() => {
+    loadHorarios();
+  }, []);
+
+  const loadHorarios = async () => {
+    try {
+      const { data: horariosData, error } = await supabase
+        .from('horarios_empleados')
+        .select('*')
+        .eq('activo', true);
+
+      if (error) throw error;
+      setHorarios(horariosData || []);
+    } catch (error) {
+      console.error('Error loading schedules:', error);
+    }
+  };
+
+  // Función para verificar si una llegada es tardía considerando el horario individual
+  const isLateArrival = (checada: Checada): boolean => {
+    if (!checada.hora_entrada) return false;
+    
+    const horario = horarios.find(h => h.usuario_id === checada.usuario_id);
+    const entryTime = formatTime(new Date(checada.hora_entrada));
+    
+    if (horario) {
+      const scheduledTime = formatTimeToHHMM(horario.hora_entrada);
+      return isLateEntryWithSchedule(entryTime, scheduledTime, horario.tolerancia_minutos);
+    } else {
+      // Usar horario por defecto si no tiene horario asignado
+      return isLateEntryWithSchedule(entryTime, '09:00', 15);
+    }
+  };
+
+  // Función para verificar si una salida es temprana considerando el horario individual
+  const isEarlyDeparture = (checada: Checada): boolean => {
+    if (!checada.hora_salida) return false;
+    
+    const horario = horarios.find(h => h.usuario_id === checada.usuario_id);
+    const exitTime = formatTime(new Date(checada.hora_salida));
+    
+    if (horario) {
+      const scheduledTime = formatTimeToHHMM(horario.hora_salida);
+      return isEarlyExitWithSchedule(exitTime, scheduledTime);
+    } else {
+      // Usar horario por defecto si no tiene horario asignado
+      return isEarlyExitWithSchedule(exitTime, '19:00');
+    }
+  };
 
   // Filtrar checadas según los filtros seleccionados
   const filteredChecadas = checadas.filter(checada => {
@@ -39,12 +90,8 @@ const AdvancedReports: React.FC<AdvancedReportsProps> = ({ usuarios, checadas, o
   // Calcular estadísticas avanzadas
   const stats = {
     totalChecadas: filteredChecadas.length,
-    llegadasTarde: filteredChecadas.filter(c => 
-      c.hora_entrada && isLateEntry(formatTime(new Date(c.hora_entrada)))
-    ).length,
-    salidasTemprano: filteredChecadas.filter(c => 
-      c.hora_salida && isEarlyExit(formatTime(new Date(c.hora_salida)))
-    ).length,
+    llegadasTarde: filteredChecadas.filter(c => isLateArrival(c)).length,
+    salidasTemprano: filteredChecadas.filter(c => isEarlyDeparture(c)).length,
     diasCompletos: filteredChecadas.filter(c => c.hora_entrada && c.hora_salida).length,
     soloEntradas: filteredChecadas.filter(c => c.hora_entrada && !c.hora_salida).length,
   };
@@ -60,19 +107,15 @@ const AdvancedReports: React.FC<AdvancedReportsProps> = ({ usuarios, checadas, o
     return {
       dia: dia.charAt(0).toUpperCase() + dia.slice(1),
       total: checadasDia.length,
-      tarde: checadasDia.filter(c => c.hora_entrada && isLateEntry(formatTime(new Date(c.hora_entrada)))).length,
-      temprano: checadasDia.filter(c => c.hora_salida && isEarlyExit(formatTime(new Date(c.hora_salida)))).length,
+      tarde: checadasDia.filter(c => isLateArrival(c)).length,
+      temprano: checadasDia.filter(c => isEarlyDeparture(c)).length,
     };
   });
 
   const dataPorEmpleado = usuarios.filter(u => u.rol === 'empleado').map(empleado => {
     const checadasEmpleado = filteredChecadas.filter(c => c.usuario_id === empleado.id);
-    const llegadasTarde = checadasEmpleado.filter(c => 
-      c.hora_entrada && isLateEntry(formatTime(new Date(c.hora_entrada)))
-    ).length;
-    const salidasTemprano = checadasEmpleado.filter(c => 
-      c.hora_salida && isEarlyExit(formatTime(new Date(c.hora_salida)))
-    ).length;
+    const llegadasTarde = checadasEmpleado.filter(c => isLateArrival(c)).length;
+    const salidasTemprano = checadasEmpleado.filter(c => isEarlyDeparture(c)).length;
 
     return {
       nombre: empleado.nombre.length > 10 ? empleado.nombre.substring(0, 10) + '...' : empleado.nombre,
@@ -124,7 +167,10 @@ const AdvancedReports: React.FC<AdvancedReportsProps> = ({ usuarios, checadas, o
             </div>
 
             <button
-              onClick={onRefresh}
+              onClick={() => {
+                onRefresh();
+                loadHorarios();
+              }}
               className="flex items-center gap-2 px-4 py-2 bg-pink-400 text-white rounded-lg hover:bg-pink-500 transition-colors"
             >
               <RefreshCw className="h-4 w-4" />
@@ -366,6 +412,9 @@ const AdvancedReports: React.FC<AdvancedReportsProps> = ({ usuarios, checadas, o
                   Estado
                 </th>
                 <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Razón Tardía
+                </th>
+                <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Horas Trabajadas
                 </th>
               </tr>
@@ -375,6 +424,9 @@ const AdvancedReports: React.FC<AdvancedReportsProps> = ({ usuarios, checadas, o
                 const horasTrabajadas = checada.hora_entrada && checada.hora_salida 
                   ? ((new Date(checada.hora_salida).getTime() - new Date(checada.hora_entrada).getTime()) / (1000 * 60 * 60)).toFixed(1)
                   : '-';
+
+                const isLate = isLateArrival(checada);
+                const isEarly = isEarlyDeparture(checada);
 
                 return (
                   <tr key={checada.id}>
@@ -388,39 +440,53 @@ const AdvancedReports: React.FC<AdvancedReportsProps> = ({ usuarios, checadas, o
                     </td>
                     <td className="px-4 sm:px-6 py-4 whitespace-nowrap">
                       <div className={`text-sm ${
-                        checada.hora_entrada && isLateEntry(formatTime(new Date(checada.hora_entrada)))
-                          ? 'text-red-600 font-semibold'
-                          : 'text-gray-900'
+                        isLate ? 'text-red-600 font-semibold' : 'text-gray-900'
                       }`}>
                         {checada.hora_entrada ? formatTime(new Date(checada.hora_entrada)) : '-'}
                       </div>
                     </td>
                     <td className="px-4 sm:px-6 py-4 whitespace-nowrap">
                       <div className={`text-sm ${
-                        checada.hora_salida && isEarlyExit(formatTime(new Date(checada.hora_salida)))
-                          ? 'text-orange-600 font-semibold'
-                          : 'text-gray-900'
+                        isEarly ? 'text-orange-600 font-semibold' : 'text-gray-900'
                       }`}>
                         {checada.hora_salida ? formatTime(new Date(checada.hora_salida)) : '-'}
                       </div>
                     </td>
                     <td className="px-4 sm:px-6 py-4 whitespace-nowrap">
                       <div className="flex flex-wrap gap-1">
-                        {checada.hora_entrada && isLateEntry(formatTime(new Date(checada.hora_entrada))) && (
+                        {isLate && (
                           <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-red-100 text-red-800">
                             Llegada Tarde
                           </span>
                         )}
-                        {checada.hora_salida && isEarlyExit(formatTime(new Date(checada.hora_salida))) && (
+                        {isEarly && (
                           <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-orange-100 text-orange-800">
                             Salida Temprano
                           </span>
                         )}
-                        {(!checada.hora_entrada || !isLateEntry(formatTime(new Date(checada.hora_entrada)))) && 
-                         (!checada.hora_salida || !isEarlyExit(formatTime(new Date(checada.hora_salida)))) && (
+                        {!isLate && !isEarly && (
                           <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-green-100 text-green-800">
                             Normal
                           </span>
+                        )}
+                      </div>
+                    </td>
+                    <td className="px-4 sm:px-6 py-4 whitespace-nowrap">
+                      <div className="text-sm text-gray-900">
+                        {checada.razon_llegada_tardia ? (
+                          <div className="flex items-center gap-1">
+                            <MessageSquare className="h-3 w-3 text-blue-500" />
+                            <span className="text-blue-700 font-medium" title={checada.razon_llegada_tardia}>
+                              {checada.razon_llegada_tardia.length > 20 
+                                ? checada.razon_llegada_tardia.substring(0, 20) + '...'
+                                : checada.razon_llegada_tardia
+                              }
+                            </span>
+                          </div>
+                        ) : (
+                          isLate ? (
+                            <span className="text-gray-400 italic">Sin razón</span>
+                          ) : '-'
                         )}
                       </div>
                     </td>

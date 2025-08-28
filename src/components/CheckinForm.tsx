@@ -1,13 +1,16 @@
 import React, { useState, useEffect } from 'react';
-import { Clock, LogIn, LogOut, User, Lock, Sparkles, Heart, Shield } from 'lucide-react';
-import { supabase } from '../lib/supabase';
-import { comparePassword, formatTime } from '../utils/auth';
+import { Clock, LogIn, LogOut, User, Lock, Sparkles, Heart, Shield, AlertTriangle, X } from 'lucide-react';
+import { supabase, HorarioEmpleado } from '../lib/supabase';
+import { comparePassword, formatTime, isLateEntryWithSchedule, formatTimeToHHMM } from '../utils/auth';
 import { isDeviceAuthorized, generateDeviceFingerprint } from '../utils/deviceAuth';
 
 export default function CheckinForm() {
   const [credentials, setCredentials] = useState({ usuario: '', contraseña: '' });
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState({ text: '', type: '' });
+  const [showLateReasonModal, setShowLateReasonModal] = useState(false);
+  const [lateReason, setLateReason] = useState('');
+  const [pendingCheckinData, setPendingCheckinData] = useState<any>(null);
 
   const showMessage = (text: string, type: string) => {
     setMessage({ text, type });
@@ -46,7 +49,6 @@ export default function CheckinForm() {
       }
 
       // VALIDACIÓN DE DISPOSITIVO AUTORIZADO PARA EMPLEADOS
-      // Los administradores pueden hacer check-in desde cualquier dispositivo
       if (user.rol === 'empleado') {
         const deviceAuthorized = await isDeviceAuthorized();
         if (!deviceAuthorized) {
@@ -60,7 +62,11 @@ export default function CheckinForm() {
       }
 
       const now = new Date();
-      const today = now.toISOString().split('T')[0];
+      // Usar zona horaria de México (UTC-6)
+      const mexicoTime = new Date(now.getTime() - (6 * 60 * 60 * 1000));
+      const today = mexicoTime.toISOString().split('T')[0];
+      const currentTime = now.toISOString(); // Mantener UTC para la base de datos
+      const currentTimeFormatted = formatTime(now);
 
       // Buscar checada existente para hoy
       const { data: existingChecada, error: checadaError } = await supabase
@@ -70,7 +76,20 @@ export default function CheckinForm() {
         .eq('fecha', today)
         .single();
 
-      const currentTime = now.toISOString();
+      // Obtener horario del empleado
+      const { data: horarioData, error: horarioError } = await supabase
+        .from('horarios_empleados')
+        .select('*')
+        .eq('usuario_id', user.id)
+        .eq('activo', true)
+        .single();
+
+      // Usar horario por defecto si no existe uno personalizado
+      const horario = horarioData || {
+        hora_entrada: '09:00:00',
+        hora_salida: '19:00:00',
+        tolerancia_minutos: 15
+      };
 
       if (type === 'entrada') {
         if (existingChecada && existingChecada.hora_entrada) {
@@ -78,19 +97,35 @@ export default function CheckinForm() {
           return;
         }
 
-        // Crear o actualizar checada con hora de entrada
-        const { error } = await supabase
-          .from('checadas')
-          .upsert({
-            usuario_id: user.id,
-            fecha: today,
-            hora_entrada: currentTime,
-            ...(existingChecada && { id: existingChecada.id })
-          });
+        // Verificar si la llegada es tardía
+        const scheduledEntryTime = formatTimeToHHMM(horario.hora_entrada);
+        const isLate = isLateEntryWithSchedule(currentTimeFormatted, scheduledEntryTime, horario.tolerancia_minutos);
 
-        if (error) throw error;
-        showMessage(`¡Buen día ${user.nombre}! Entrada registrada a las ${formatTime(now)}`, 'success');
+        if (isLate) {
+          // Mostrar modal para razón de llegada tardía
+          setPendingCheckinData({
+            user,
+            today,
+            currentTime,
+            existingChecada,
+            isLate: true
+          });
+          setShowLateReasonModal(true);
+          setLoading(false);
+          return;
+        }
+
+        // Procesar entrada normal (no tardía)
+        await processCheckin({
+          user,
+          today,
+          currentTime,
+          existingChecada,
+          isLate: false
+        });
+
       } else {
+        // Lógica para salida
         if (!existingChecada || !existingChecada.hora_entrada) {
           showMessage('Debes registrar tu entrada antes de la salida', 'error');
           return;
@@ -121,6 +156,59 @@ export default function CheckinForm() {
     }
   };
 
+  const processCheckin = async (data: any) => {
+    try {
+      const { user, today, currentTime, existingChecada, isLate } = data;
+      
+      const checkinData: any = {
+        usuario_id: user.id,
+        fecha: today,
+        hora_entrada: currentTime,
+        ...(existingChecada && { id: existingChecada.id })
+      };
+
+      // Agregar razón de llegada tardía si aplica
+      if (isLate && lateReason.trim()) {
+        checkinData.razon_llegada_tardia = lateReason.trim();
+      }
+
+      const { error } = await supabase
+        .from('checadas')
+        .upsert(checkinData);
+
+      if (error) throw error;
+
+      const now = new Date(currentTime);
+      const lateMessage = isLate ? ' (Llegada tardía registrada)' : '';
+      showMessage(`¡Buen día ${user.nombre}! Entrada registrada a las ${formatTime(now)}${lateMessage}`, 'success');
+      
+      // Limpiar estados
+      setLateReason('');
+      setPendingCheckinData(null);
+      setShowLateReasonModal(false);
+      setCredentials({ usuario: '', contraseña: '' });
+    } catch (error) {
+      showMessage('Error al registrar entrada', 'error');
+      console.error('Process checkin error:', error);
+    }
+  };
+
+  const handleLateReasonSubmit = async () => {
+    if (pendingCheckinData) {
+      await processCheckin({
+        ...pendingCheckinData,
+        isLate: true
+      });
+    }
+  };
+
+  const handleLateReasonCancel = () => {
+    setShowLateReasonModal(false);
+    setLateReason('');
+    setPendingCheckinData(null);
+    setLoading(false);
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-rose-50 via-pink-50 to-purple-100 flex items-center justify-center p-4 relative overflow-hidden">
       {/* Elementos decorativos de fondo */}
@@ -138,19 +226,19 @@ export default function CheckinForm() {
       </div>
 
       {/* Contenedor principal */}
-      <div className="bg-white/80 backdrop-blur-lg rounded-3xl shadow-2xl border border-white/20 p-8 w-full max-w-md relative z-10">
+      <div className="bg-white/80 backdrop-blur-lg rounded-3xl shadow-2xl border border-white/20 p-6 sm:p-8 w-full max-w-md relative z-10 my-4">
         {/* Header mejorado */}
-        <div className="text-center mb-8">
-          <div className="relative mb-6">
-            <div className="bg-gradient-to-r from-rose-400 via-pink-400 to-purple-400 rounded-full w-24 h-24 flex items-center justify-center mx-auto shadow-lg">
-              <Clock className="h-12 w-12 text-white drop-shadow-sm" />
+        <div className="text-center mb-6">
+          <div className="relative mb-4">
+            <div className="bg-gradient-to-r from-rose-400 via-pink-400 to-purple-400 rounded-full w-20 h-20 flex items-center justify-center mx-auto shadow-lg">
+              <Clock className="h-10 w-10 text-white drop-shadow-sm" />
             </div>
             <div className="absolute -top-1 -right-1">
-              <Sparkles className="h-6 w-6 text-rose-400 animate-pulse" />
+              <Sparkles className="h-5 w-5 text-rose-400 animate-pulse" />
             </div>
           </div>
           
-          <h1 className="text-3xl font-bold bg-gradient-to-r from-rose-600 via-pink-600 to-purple-600 bg-clip-text text-transparent mb-3">
+          <h1 className="text-2xl font-bold bg-gradient-to-r from-rose-600 via-pink-600 to-purple-600 bg-clip-text text-transparent mb-2">
             Estética Carolina Nieto
           </h1>
           <p className="text-gray-600 text-sm font-medium">Checador Virtual</p>
@@ -158,7 +246,7 @@ export default function CheckinForm() {
         </div>
 
         {/* Formulario mejorado */}
-        <div className="space-y-6">
+        <div className="space-y-5">
           <div className="relative">
             <label className="block text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
               <div className="p-1 bg-rose-100 rounded-full">
@@ -256,11 +344,70 @@ export default function CheckinForm() {
         {/* Footer decorativo */}
         <div className="mt-8 pt-6 border-t border-gray-200/50">
           <div className="flex items-center justify-center gap-2 text-gray-400 text-sm">
-            <span>Entrada 9 AM </span>
-            <span>Salida 7 PM </span>
           </div>
         </div>
       </div>
+
+      {/* Modal para razón de llegada tardía */}
+      {showLateReasonModal && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-2 sm:p-4">
+          <div className="bg-white/95 backdrop-blur-lg rounded-2xl sm:rounded-3xl shadow-2xl border border-white/20 p-4 sm:p-6 lg:p-8 w-full max-w-md relative animate-in fade-in-0 zoom-in-95 duration-300 max-h-[90vh] overflow-y-auto">
+            {/* Header del modal */}
+            <div className="text-center mb-4 sm:mb-6">
+              <div className="bg-gradient-to-r from-orange-400 to-red-400 rounded-full w-12 h-12 sm:w-16 sm:h-16 flex items-center justify-center mx-auto shadow-lg mb-3 sm:mb-4">
+                <AlertTriangle className="h-6 w-6 sm:h-8 sm:w-8 text-white drop-shadow-sm" />
+              </div>
+              <h2 className="text-lg sm:text-xl lg:text-2xl font-bold text-gray-800 mb-2">Llegada Tardía Detectada</h2>
+              <p className="text-gray-600 text-xs sm:text-sm px-2">
+                Has llegado después de tu horario programado. Por favor, proporciona una razón (opcional).
+              </p>
+            </div>
+
+            {/* Campo de texto para la razón */}
+            <div className="mb-4 sm:mb-6">
+              <label className="block text-xs sm:text-sm font-semibold text-gray-700 mb-2 sm:mb-3">
+                Razón de llegada tardía
+              </label>
+              <textarea
+                value={lateReason}
+                onChange={(e) => setLateReason(e.target.value)}
+                className="w-full px-3 py-2 sm:px-4 sm:py-3 border-2 border-gray-200 rounded-xl sm:rounded-2xl focus:outline-none focus:ring-2 focus:ring-orange-400 focus:border-orange-400 transition-all duration-300 bg-white/70 backdrop-blur-sm placeholder-gray-400 resize-none text-sm sm:text-base"
+                placeholder="Ejemplo: Tráfico intenso, cita médica, etc. (opcional)"
+                rows={3}
+                maxLength={200}
+              />
+              <div className="text-right text-xs text-gray-500 mt-1">
+                {lateReason.length}/200 caracteres
+              </div>
+            </div>
+
+            {/* Botones del modal */}
+            <div className="flex flex-col sm:flex-row gap-2 sm:gap-3">
+              <button
+                onClick={handleLateReasonCancel}
+                className="flex-1 px-3 py-2 sm:px-4 sm:py-3 bg-gray-100 text-gray-700 rounded-xl sm:rounded-2xl hover:bg-gray-200 transition-all duration-300 font-semibold flex items-center justify-center gap-2 text-sm sm:text-base order-2 sm:order-1"
+              >
+                <X className="h-3 w-3 sm:h-4 sm:w-4" />
+                Cancelar
+              </button>
+              <button
+                onClick={handleLateReasonSubmit}
+                className="flex-1 px-3 py-2 sm:px-4 sm:py-3 bg-gradient-to-r from-orange-400 to-red-400 text-white rounded-xl sm:rounded-2xl hover:from-orange-500 hover:to-red-500 transition-all duration-300 font-semibold flex items-center justify-center gap-2 shadow-lg text-sm sm:text-base order-1 sm:order-2"
+              >
+                <Clock className="h-3 w-3 sm:h-4 sm:w-4" />
+                Registrar Entrada
+              </button>
+            </div>
+
+            {/* Nota informativa */}
+            <div className="mt-3 sm:mt-4 p-2 sm:p-3 bg-orange-50 border border-orange-200 rounded-lg sm:rounded-xl">
+              <p className="text-xs text-orange-700 text-center">
+                <strong>Nota:</strong> Puedes dejar la razón en blanco si prefieres no especificarla.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
